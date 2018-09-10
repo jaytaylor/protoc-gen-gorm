@@ -218,7 +218,7 @@ func (p *OrmPlugin) parseBasicFields(msg *generator.Descriptor) {
 			continue
 		}
 		tag := fieldOpts.GetTag()
-		fieldName := generator.CamelCase(field.GetName())
+		fieldName := p.goFieldName(field)
 		fieldType, _ := p.GoType(msg, field)
 		var typePackage string
 		if (*(field.Type) != typeMessage || !p.isOrmable(fieldType)) && field.IsRepeated() {
@@ -592,7 +592,7 @@ func (p *OrmPlugin) generateConvertFunctions(message *generator.Descriptor) {
 		if getFieldOptions(field).GetDrop() {
 			continue
 		}
-		ofield := ormable.Fields[generator.CamelCase(field.GetName())]
+		ofield := ormable.Fields[p.goFieldName(field)]
 		p.generateFieldConversion(message, field, true, ofield)
 	}
 	if getMessageOptions(message).GetMultiAccount() {
@@ -627,7 +627,7 @@ func (p *OrmPlugin) generateConvertFunctions(message *generator.Descriptor) {
 		if getFieldOptions(field).GetDrop() {
 			continue
 		}
-		ofield := ormable.Fields[generator.CamelCase(field.GetName())]
+		ofield := ormable.Fields[p.goFieldName(field)]
 		p.generateFieldConversion(message, field, false, ofield)
 	}
 	p.P(`if posthook, ok := interface{}(m).(`, typeName, `WithAfterToPB); ok {`)
@@ -639,7 +639,7 @@ func (p *OrmPlugin) generateConvertFunctions(message *generator.Descriptor) {
 
 // Output code that will convert a field to/from orm.
 func (p *OrmPlugin) generateFieldConversion(message *generator.Descriptor, field *descriptor.FieldDescriptorProto, toORM bool, ofield *Field) error {
-	fieldName := generator.CamelCase(field.GetName())
+	fieldName := p.goFieldName(field)
 	fieldType, _ := p.GoType(message, field)
 	if field.IsRepeated() { // Repeated Object ----------------------------------
 		if p.isOrmable(fieldType) { // Repeated ORMable type

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/gogo/protobuf/gogoproto"
+	"github.com/gogo/protobuf/protoc-gen-gogo/descriptor"
 	"github.com/gogo/protobuf/protoc-gen-gogo/generator"
 	jgorm "github.com/jinzhu/gorm"
 )
@@ -203,7 +205,7 @@ func (p *OrmPlugin) generateApplyFieldMask(message *generator.Descriptor) {
 	for _, field := range message.GetField() {
 		fieldType, _ := p.GoType(message, field)
 		if field.IsMessage() && !isSpecialType(fieldType) && !field.IsRepeated() {
-			p.P(`var updated`, generator.CamelCase(field.GetName()), ` bool`)
+			p.P(`var updated`, p.goFieldName(field), ` bool`)
 			hasNested = true
 		}
 	}
@@ -215,7 +217,7 @@ func (p *OrmPlugin) generateApplyFieldMask(message *generator.Descriptor) {
 		p.P(`for _, f := range updateMask.Paths {`)
 	}
 	for _, field := range message.GetField() {
-		ccName := generator.CamelCase(field.GetName())
+		ccName := p.goFieldName(field)
 		fieldType, _ := p.GoType(message, field)
 		//  for ormable message, do recursive patching
 		if field.IsMessage() && p.isOrmable(fieldType) && !field.IsRepeated() {
@@ -323,10 +325,11 @@ func (p *OrmPlugin) generatePatchHandler(message *generator.Descriptor) {
 	p.P(`var pbObj `, typeName)
 	p.P(`var err error`)
 	p.generateBeforePatchHookCall(ormable, "Read")
+
 	if p.readHasFieldSelection(ormable) {
-		p.P(`pbReadRes, err := DefaultRead`, typeName, `(ctx, &`, typeName, `{Id: in.GetId()}, db, nil)`)
+		p.P(`pbReadRes, err := DefaultRead`, typeName, `(ctx, &`, typeName, fmt.Sprintf(`{%[1]v: in.Get%[1]v()}, db, nil)`, p.goPKFieldName(message)))
 	} else {
-		p.P(`pbReadRes, err := DefaultRead`, typeName, `(ctx, &`, typeName, `{Id: in.GetId()}, db)`)
+		p.P(`pbReadRes, err := DefaultRead`, typeName, `(ctx, &`, typeName, fmt.Sprintf(`{%[1]v: in.Get%[1]v()}, db)`, p.goPKFieldName(message)))
 	}
 
 	p.P(`if err != nil {`)
@@ -770,4 +773,24 @@ func (p *OrmPlugin) listHasFieldSelection(ormable *OrmableType) bool {
 		}
 	}
 	return false
+}
+
+// goPKFieldName returns the golang-formatted version of the ID field name.
+func (p *OrmPlugin) goPKFieldName(message *generator.Descriptor) string {
+	for _, field := range message.Field {
+		if getFieldOptions(field).GetTag().GetPrimaryKey() {
+			return p.goFieldName(field)
+		}
+	}
+	panic(fmt.Errorf("no primary-key field found for message=%v", message.String()))
+}
+
+// goFieldName returns the golang-formatted version of a field name.
+//
+// Custom name overrides specified through gogoproto.customname are respected.
+func (_ *OrmPlugin) goFieldName(field *descriptor.FieldDescriptorProto) string {
+	if gogoproto.IsCustomName(field) {
+		return gogoproto.GetCustomName(field)
+	}
+	return generator.CamelCase(field.GetName())
 }

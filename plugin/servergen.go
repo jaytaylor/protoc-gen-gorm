@@ -181,9 +181,9 @@ func (p *OrmPlugin) generateReadServerMethod(service autogenService, method auto
 		p.generatePreserviceCall(service.ccName, method.baseType, method.ccName)
 		typeName := method.baseType
 		if fields := p.getFieldSelection(method.inType); fields != "" {
-			p.P(`res, err := DefaultRead`, typeName, `(ctx, &`, typeName, `{Id: in.GetId()}, db, in.`, fields, `)`)
+			p.P(`res, err := DefaultRead`, typeName, `(ctx, &`, typeName, fmt.Sprintf(`{%[1]v: in.Get%[1]v()}, db, in.`, p.goPKFieldName(method.inType.(*generator.Descriptor))), fields, `)`)
 		} else {
-			p.P(`res, err := DefaultRead`, typeName, `(ctx, &`, typeName, `{Id: in.GetId()}, db)`)
+			p.P(`res, err := DefaultRead`, typeName, `(ctx, &`, typeName, fmt.Sprintf(`{%[1]v: in.Get%[1]v()}, db)`, p.goPKFieldName(method.inType.(*generator.Descriptor))))
 		}
 		p.P(`if err != nil {`)
 		p.P(`return nil, err`)
@@ -318,7 +318,7 @@ func (p *OrmPlugin) generateDeleteServerMethod(service autogenService, method au
 		typeName := method.baseType
 		p.generateDBSetup(service)
 		p.generatePreserviceCall(service.ccName, method.baseType, method.ccName)
-		p.P(`err := DefaultDelete`, typeName, `(ctx, &`, typeName, `{Id: in.GetId()}, db)`)
+		p.P(`err := DefaultDelete`, typeName, `(ctx, &`, typeName, fmt.Sprintf(`{%[1]v: in.Get%[1]v()}, db)`, p.goPKFieldName(method.inType.(*generator.Descriptor))))
 		p.P(`if err != nil {`)
 		p.P(`return nil, err`)
 		p.P(`}`)
